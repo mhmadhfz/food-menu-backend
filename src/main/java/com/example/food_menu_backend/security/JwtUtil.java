@@ -1,39 +1,44 @@
 package com.example.food_menu_backend.security;
 
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
+
+import java.util.Base64;
 import java.util.Date;
 
 @Component
 public class JwtUtil {
 
-    @Value("${jwt.secret}")
-    private String jwtSecret;
+    private final SecretKey key;
 
-    @Value("${jwt.expiration}")
-    private long jwtExpiration;
+    private final long jwtExpiration;
 
-    private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-    }
+    public JwtUtil(
+                @Value("${jwt.secret}") String secret,
+                @Value("${jwt.expiration}") long jwtExpiration
+        ) {
+            byte[] keyBytes = Base64.getDecoder().decode(secret);
+            this.key = Keys.hmacShaKeyFor(keyBytes);
+            this.jwtExpiration = jwtExpiration;
+        }
 
     public String generateToken(String username) {
         return Jwts.builder()
                 .setSubject(username)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
-                .signWith(getSigningKey())
+                .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
 
     public String extractUsername(String token) {
         return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+                .setSigningKey(key)
                 .build()
                 .parseClaimsJws(token)
                 .getBody()
